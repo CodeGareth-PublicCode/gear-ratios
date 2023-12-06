@@ -223,18 +223,20 @@ mod tests {
             dbg!(position);
 
             if combo == (true, true) {
-                let window_coordinates_for_known_symbol_and_adjacent_number = (map_position_to_coordinate(position));
+                let window_coordinates_for_known_symbol_and_adjacent_number =
+                    (map_position_to_coordinate(position));
                 dbg!(target_window);
-                assert_eq!(([0,0],[1,1]),window_coordinates_for_known_symbol_and_adjacent_number)
+                assert_eq!(
+                    ([0, 0], [1, 1]),
+                    window_coordinates_for_known_symbol_and_adjacent_number
+                )
             }
         }
 
         // to do - is it possible to then establish your row number then relative position to main grid?
-
     }
 
     fn map_position_to_coordinate(position: usize) -> ([i32; 2], [i32; 2]) {
-
         // [(a1, a2),
         //  (b1, b2),
         //  (a1, b1),
@@ -243,13 +245,13 @@ mod tests {
         //  (a1, b2)];
 
         match position {
-            0 => ([0,0],[0,1]),
-            1 => ([1,0],[1,1]),
-            2 => ([0,0],[1,0]),
-            3 => ([0,1],[1,1]),
-            4 => ([1,0],[0,1]),
-            5 => ([0,0],[1,1]),
-            _ => ([9,9],[9,9]),
+            0 => ([0, 0], [0, 1]),
+            1 => ([1, 0], [1, 1]),
+            2 => ([0, 0], [1, 0]),
+            3 => ([0, 1], [1, 1]),
+            4 => ([1, 0], [0, 1]),
+            5 => ([0, 0], [1, 1]),
+            _ => ([9, 9], [9, 9]),
         }
     }
 }
