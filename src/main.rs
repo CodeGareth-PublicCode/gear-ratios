@@ -43,12 +43,14 @@ fn logic_docs() {
 
 #[cfg(test)]
 mod tests {
-    use itertools::{interleave, izip, peek_nth, Itertools};
+    use itertools::Itertools;
     use ndarray::iter::Windows;
     use ndarray::ArrayView;
     use ndarray::Dim;
     use ndarray::{Array, Ix};
     use std::collections::HashMap;
+    use tracing::event;
+    use tracing::{span, Level};
 
     #[test]
     fn test_masking_logic_to_find_all_that_are_not_a_dot() {
@@ -204,6 +206,8 @@ mod tests {
         // Knowing the anchor column and anchor row, means you have the opportunity to track position
         // in the source main array
 
+        // let mut numbers_adjacent_to_symbol_store: HashMap<K, V> = HashMap::new();
+
         for (anchor_row, chunk) in not_a_dot_mask.chunks(chunk_length).enumerate() {
             for (chunk_column, window_element) in chunk.iter().enumerate() {
                 let a1: bool = window_element.get((0, 0)).unwrap().to_owned();
@@ -219,6 +223,7 @@ mod tests {
                     // or number symbol in any direction
                     if combo == (true, true) {
                         let (position_a, position_b) = map_position_to_coordinate(position);
+                        println!("Testing {:?} and {:?}", position_a, position_b);
 
                         // Offset to get back to original array X x X array
                         let original_a_y_axis = anchor_row + position_a[0];
@@ -239,11 +244,42 @@ mod tests {
                         if position_a.chars().any(|char| char.is_numeric())
                             && position_b.chars().any(|char| !char.is_numeric())
                         {
-                            dbg!(position_a, position_b);
+                            // now you know that position a is near a symbol you want to
+                            // then look across the columns to trace the overall number
+                            // but because if a symbol is adjacent to the middle of a number
+                            // you'll hit duplicates, it means, you need to store and reference by
+                            // coordinate value
+                            //
+                            // dbg!(position_a);
+                            // dbg!(original_a_x_axis);
+
+                            let search_row: Vec<&&str> =
+                                binding.row(original_a_y_axis).into_iter().collect();
+
+                            dbg!(&search_row);
+                            dbg!(&search_row[0..original_a_x_axis + 1]);
+                            dbg!(&search_row[original_a_x_axis..chunk.len()]);
+
+                            // let first_dot_found_next_to_number =  &search_row[0..original_a_x_axis+1].iter().find_position(|&&element| element.to_owned() == ".").unwrap_or(());
+                            // let last_dot_found_next_to_number = &search_row[original_a_x_axis..chunk.len()].iter().find_position(|&&element| element.to_owned() == ".").unwrap().0;
+
+                            // println!("{}{}", first_dot_found_next_to_number, last_dot_found_next_to_number);
+                            // dbg!(search_row[first_dot_found_next_to_number..last_dot_found_next_to_number]);
                         } else if position_a.chars().any(|char| !char.is_numeric())
                             && position_b.chars().any(|char| char.is_numeric())
                         {
-                            dbg!(position_a, position_b);
+                            // now you know that position b is near a symbol you want to
+                            // then look across the columns to trace the overall number
+                            // but because if a symbol is adjacent to the middle of a number
+                            // you'll hit duplicates, it means, you need to store and reference by
+                            // coordinate value
+
+                            let search_row: Vec<&&str> =
+                                binding.row(original_b_y_axis).into_iter().collect();
+
+                            dbg!(&search_row);
+                            dbg!(&search_row[0..original_b_x_axis + 1]);
+                            dbg!(&search_row[original_b_x_axis..chunk.len()]);
                         } else {
                             println!("Pair are both numeric and therefore not relevant to close to a symbol")
                         }
