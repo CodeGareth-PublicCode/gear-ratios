@@ -156,7 +156,7 @@ mod tests {
         // [., ., 3, 5, ., ., 6, 3, 3, .]]
 
         let binding = Array::from_shape_vec((3, 10), giant).unwrap();
-
+        println!("{}", &binding);
         // Iter of 2x2 windows
         // [[4,6]
         //  [.,.]]
@@ -205,38 +205,55 @@ mod tests {
         // in the source main array
 
         for (anchor_row, chunk) in not_a_dot_mask.chunks(chunk_length).enumerate() {
-            window_store.entry(anchor_row).or_insert(chunk);
-        }
+            for (chunk_column, window_element) in chunk.iter().enumerate() {
+                let a1: bool = window_element.get((0, 0)).unwrap().to_owned();
+                let a2: bool = window_element.get((0, 1)).unwrap().to_owned();
+                let b1: bool = window_element.get((1, 0)).unwrap().to_owned();
+                let b2: bool = window_element.get((1, 1)).unwrap().to_owned();
 
-        let anchor_row_zero = window_store.get(&0).unwrap();
-        let target_window = anchor_row_zero.get(2).unwrap();
+                let combinations: [(bool, bool); 6] =
+                    [(a1, a2), (b1, b2), (a1, b1), (a2, b2), (b1, a2), (a1, b2)];
 
-        let a1: bool = target_window.get((0, 0)).unwrap().to_owned();
-        let a2: bool = target_window.get((0, 1)).unwrap().to_owned();
-        let b1: bool = target_window.get((1, 0)).unwrap().to_owned();
-        let b2: bool = target_window.get((1, 1)).unwrap().to_owned();
+                for (position, &combo) in combinations.iter().enumerate() {
+                    // Find a position where there's a number number,
+                    // or number symbol in any direction
+                    if combo == (true, true) {
+                        let (position_a, position_b) = map_position_to_coordinate(position);
 
-        let combinations: [(bool, bool); 6] =
-            [(a1, a2), (b1, b2), (a1, b1), (a2, b2), (b1, a2), (a1, b2)];
+                        // Offset to get back to original array X x X array
+                        let original_a_y_axis = anchor_row + position_a[0];
+                        let original_a_x_axis = chunk_column + position_a[1];
 
-        for (position, &combo) in combinations.iter().enumerate() {
-            dbg!(position);
+                        let original_b_y_axis = anchor_row + position_b[0];
+                        let original_b_x_axis = chunk_column + position_b[1];
 
-            if combo == (true, true) {
-                let window_coordinates_for_known_symbol_and_adjacent_number =
-                    (map_position_to_coordinate(position));
-                dbg!(target_window);
-                assert_eq!(
-                    ([0, 0], [1, 1]),
-                    window_coordinates_for_known_symbol_and_adjacent_number
-                )
+                        // Establish original value
+                        let position_a: &&str =
+                            binding.get((original_a_y_axis, original_a_x_axis)).unwrap();
+                        let position_b: &&str =
+                            binding.get((original_b_y_axis, original_b_x_axis)).unwrap();
+
+                        // Only care if one of the two are a symbol
+                        println!("Testing {} and {}", position_a, position_b);
+
+                        if position_a.chars().any(|char| char.is_numeric())
+                            && position_b.chars().any(|char| !char.is_numeric())
+                        {
+                            dbg!(position_a, position_b);
+                        } else if position_a.chars().any(|char| !char.is_numeric())
+                            && position_b.chars().any(|char| char.is_numeric())
+                        {
+                            dbg!(position_a, position_b);
+                        } else {
+                            println!("Pair are both numeric and therefore not relevant to close to a symbol")
+                        }
+                    }
+                }
             }
         }
-
-        // to do - is it possible to then establish your row number then relative position to main grid?
     }
 
-    fn map_position_to_coordinate(position: usize) -> ([i32; 2], [i32; 2]) {
+    fn map_position_to_coordinate(position: usize) -> ([usize; 2], [usize; 2]) {
         // [(a1, a2),
         //  (b1, b2),
         //  (a1, b1),
