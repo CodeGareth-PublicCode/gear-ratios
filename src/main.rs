@@ -152,78 +152,44 @@ mod tests {
             ".", ".", ".", ".", ".", "3", "5", ".", ".", "6", "3", "3", ".",
         ];
 
-        // Master multidimensional array
-        // [[4, 6, 7, ., ., 1, 1, 4, ., .],
-        // [., ., ., *, ., ., ., ., ., .],
-        // [., ., 3, 5, ., ., 6, 3, 3, .]]
-
+        // Form big multidimensional array
         let binding = Array::from_shape_vec((3, 10), giant).unwrap();
-        println!("{}", &binding);
-        // Iter of 2x2 windows
-        // [[4,6]
-        //  [.,.]]
-        //
-        // [[6,7]
-        // [.,.]]
-        //
-        // [[7,.]
-        // [.,*]]
-
-        // a 3 x 10 grid, converted to 2 x 2s, provides 18 window slices
-
-        // an a x b grid converts to
-        // (a-1) x (b-1) = number of windows
-        // number of windows x 6 = combos to parse
-        // so a 3 x 10 grid converts to
-        // (2 * 9) = 18 windows
-        // 18 * 6 = 108 combos to parse
-
         let windows: Vec<ArrayView<&str, Dim<[Ix; 2]>>> =
             binding.windows(Dim((2, 2))).into_iter().collect();
 
-        // Iter of 2x2 masked windows
-        // [[T,T]
-        //  [F,F]]
-        //
-        // [[T,T]
-        // [F,F]]
-        //
-        // [[T,F]
-        // [F,T]]
-
+        // Convert to T or F whether it is a dot
         let not_a_dot_mask: Vec<Array<bool, Dim<[Ix; 2]>>> = windows
             .iter()
             .map(|window| window.map(|element| !(element.to_owned() == ".")))
             .collect();
 
+        // Chunk size to help reflect rows
         let chunk_length = binding.row(0).len() - 1;
+        let mut final_number_store: Vec<i32> = vec![];
 
-        let mut window_store: HashMap<usize, &[Array<bool, Dim<[Ix; 2]>>]> = HashMap::new();
-
-        // Chunk per row, store anchor reference,
-        // This means when you iterate through hashmap values
-        // You can then enumerate the values, and each position = anchor column
-        // Knowing the anchor column and anchor row, means you have the opportunity to track position
-        // in the source main array
-
-        // let mut numbers_adjacent_to_symbol_store: HashMap<K, V> = HashMap::new();
-
+        // For chunks of windows that are working horizontal across array, and move 1 row down at end of every chunk row
         for (anchor_row, chunk) in not_a_dot_mask.chunks(chunk_length).enumerate() {
+
+            // Within that chunk, moving across columns 1 at a time
             for (chunk_column, window_element) in chunk.iter().enumerate() {
+
+                // Establish easy grid references
                 let a1: bool = window_element.get((0, 0)).unwrap().to_owned();
                 let a2: bool = window_element.get((0, 1)).unwrap().to_owned();
                 let b1: bool = window_element.get((1, 0)).unwrap().to_owned();
                 let b2: bool = window_element.get((1, 1)).unwrap().to_owned();
 
+                // Build out tuples reflecting every possible combo within a 2x2 grid
                 let combinations: [(bool, bool); 6] =
                     [(a1, a2), (b1, b2), (a1, b1), (a2, b2), (b1, a2), (a1, b2)];
 
+                // Your looking for a pattern of TT to match that neither are a dot
+                // But 1 could be a symbol
                 for (position, &combo) in combinations.iter().enumerate() {
-                    // Find a position where there's a number number,
-                    // or number symbol in any direction
+
                     if combo == (true, true) {
+                        // Translate values back to coordinates of 2x2 window grid
                         let (position_a, position_b) = map_position_to_coordinate(position);
-                        println!("Testing {:?} and {:?}", position_a, position_b);
 
                         // Offset to get back to original array X x X array
                         let original_a_y_axis = anchor_row + position_a[0];
@@ -232,57 +198,48 @@ mod tests {
                         let original_b_y_axis = anchor_row + position_b[0];
                         let original_b_x_axis = chunk_column + position_b[1];
 
-                        // Establish original value
+                        // Pull original values back from first array
                         let position_a: &&str =
                             binding.get((original_a_y_axis, original_a_x_axis)).unwrap();
                         let position_b: &&str =
                             binding.get((original_b_y_axis, original_b_x_axis)).unwrap();
 
-                        // Only care if one of the two are a symbol
-                        println!("Testing {} and {}", position_a, position_b);
-
+                        // If position a is numeric, and not a symbol like position b
                         if position_a.chars().any(|char| char.is_numeric())
                             && position_b.chars().any(|char| !char.is_numeric())
                         {
-                            // now you know that position a is near a symbol you want to
-                            // then look across the columns to trace the overall number
-                            // but because if a symbol is adjacent to the middle of a number
-                            // you'll hit duplicates, it means, you need to store and reference by
-                            // coordinate value
-                            //
-                            // dbg!(position_a);
-                            // dbg!(original_a_x_axis);
+                            {
+                                // Begin the process of looking across the row to parse where
+                                // a solid number is delimited by "."s
+                                let mut search_row: Vec<&&str> =
+                                    binding.row(original_a_y_axis).into_iter().collect();
+                                let mut number_store: Vec<i32> = vec![];
 
-                            let mut search_row: Vec<&&str> =
-                                binding.row(original_a_y_axis).into_iter().collect();
-                            let mut number_store: Vec<i32> = vec![];
-
-                            // Search from first up until the number found
-                            for element in &search_row[0..original_a_x_axis + 1] {
-                                if element.chars().any(|char| char.is_numeric()) {
-                                    let stored_number = element.clone().parse::<i32>().unwrap();
-                                    number_store.push(stored_number);
-                                    (dbg!(element));
+                                // Search from first up until the number found
+                                for element in &search_row[0..original_a_x_axis + 1] {
+                                    if element.chars().any(|char| char.is_numeric()) {
+                                        let stored_number = element.clone().parse::<i32>().unwrap();
+                                        number_store.push(stored_number);
+                                    }
                                 }
+
+                                // Continue after the found number to see if it continues, if not break
+                                for element in &search_row[original_a_x_axis + 1..chunk.len()] {
+                                    if element.chars().any(|char| char.is_numeric()) {
+                                        let stored_number = element.clone().parse::<i32>().unwrap();
+                                        number_store.push(stored_number);
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                // Now you've finished looking between "." and established the number,
+                                // Return the found number
+                                let result: String = number_store.iter().map(ToString::to_string).collect();
+                                final_number_store.push(result.parse().unwrap());
                             }
 
-                            for element in &search_row[original_a_x_axis+1..chunk.len()] {
-                                if element.chars().any(|char| char.is_numeric()) {
-                                    let stored_number = element.clone().parse::<i32>().unwrap();
-                                    number_store.push(stored_number);
-                                    (dbg!(element));
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            let stuff: String = number_store.iter().map(ToString::to_string).collect();
-                            dbg!(&stuff);
-                            println!("Bro found a number {}", stuff);
-
-
-                            // println!("{}{}", first_dot_found_next_to_number, last_dot_found_next_to_number);
-                            // dbg!(search_row[first_dot_found_next_to_number..last_dot_found_next_to_number]);
+                        // else if the position a is a symbol and b is a numeric
                         } else if position_a.chars().any(|char| !char.is_numeric())
                             && position_b.chars().any(|char| char.is_numeric())
                         {
@@ -294,18 +251,43 @@ mod tests {
 
                             let search_row: Vec<&&str> =
                                 binding.row(original_b_y_axis).into_iter().collect();
+                            let mut number_store: Vec<i32> = vec![];
 
-                            dbg!(&search_row);
-                            dbg!(&search_row[0..original_b_x_axis + 1]);
-                            dbg!(&search_row[original_b_x_axis..chunk.len()]);
+                            // Search from first up until the number found
+                            for element in &search_row[0..original_b_x_axis + 1] {
+                                if element.chars().any(|char| char.is_numeric()) {
+                                    let stored_number = element.clone().parse::<i32>().unwrap();
+                                    number_store.push(stored_number);
+                                }
+                            }
+
+                            // Continue after the found number to see if it continues, if not break
+                            for element in &search_row[original_b_x_axis+1..chunk.len()] {
+                                if element.chars().any(|char| char.is_numeric()) {
+                                    let stored_number = element.clone().parse::<i32>().unwrap();
+                                    number_store.push(stored_number);
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            // Now you've finished looking between "." and established the number,
+                            // Return the found number
+                            let result: String = number_store.iter().map(ToString::to_string).collect();
+                            final_number_store.push(result.parse().unwrap());
+
+
                         } else {
-                            println!("Pair are both numeric and therefore not relevant to close to a symbol")
+                            break
                         }
                     }
                 }
             }
         }
+
+        assert_eq!(final_number_store, [467,35]);
     }
+
 
     fn map_position_to_coordinate(position: usize) -> ([usize; 2], [usize; 2]) {
         // [(a1, a2),
