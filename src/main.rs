@@ -253,15 +253,33 @@ mod tests {
                             // dbg!(position_a);
                             // dbg!(original_a_x_axis);
 
-                            let search_row: Vec<&&str> =
+                            let mut search_row: Vec<&&str> =
                                 binding.row(original_a_y_axis).into_iter().collect();
+                            let mut number_store: Vec<i32> = vec![];
 
-                            dbg!(&search_row);
-                            dbg!(&search_row[0..original_a_x_axis + 1]);
-                            dbg!(&search_row[original_a_x_axis..chunk.len()]);
+                            // Search from first up until the number found
+                            for element in &search_row[0..original_a_x_axis + 1] {
+                                if element.chars().any(|char| char.is_numeric()) {
+                                    let stored_number = element.clone().parse::<i32>().unwrap();
+                                    number_store.push(stored_number);
+                                    (dbg!(element));
+                                }
+                            }
 
-                            // let first_dot_found_next_to_number =  &search_row[0..original_a_x_axis+1].iter().find_position(|&&element| element.to_owned() == ".").unwrap_or(());
-                            // let last_dot_found_next_to_number = &search_row[original_a_x_axis..chunk.len()].iter().find_position(|&&element| element.to_owned() == ".").unwrap().0;
+                            for element in &search_row[original_a_x_axis+1..chunk.len()] {
+                                if element.chars().any(|char| char.is_numeric()) {
+                                    let stored_number = element.clone().parse::<i32>().unwrap();
+                                    number_store.push(stored_number);
+                                    (dbg!(element));
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            let stuff: String = number_store.iter().map(ToString::to_string).collect();
+                            dbg!(&stuff);
+                            println!("Bro found a number {}", stuff);
+
 
                             // println!("{}{}", first_dot_found_next_to_number, last_dot_found_next_to_number);
                             // dbg!(search_row[first_dot_found_next_to_number..last_dot_found_next_to_number]);
