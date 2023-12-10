@@ -2,6 +2,9 @@ use ndarray::{Array, ArrayBase, ArrayView, Dim, Ix, OwnedRepr};
 use std::collections::{HashMap, HashSet};
 use std::slice::Chunks;
 
+
+// ---- PART 1 START ----
+
 fn main() {
     let file_path: &str = "./src/input.txt";
     let content: String = std::fs::read_to_string(file_path).expect("should read from file");
@@ -573,3 +576,5 @@ mod tests {
         assert_eq!(established_values_adjacent_to_symbol, 4361);
     }
 }
+
+// ---- PART 1 END ----
