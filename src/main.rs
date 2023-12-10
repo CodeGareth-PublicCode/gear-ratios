@@ -405,10 +405,8 @@ mod tests {
         )
     }
 
-
     #[test]
     fn test_extract_numbers_adjacent_to_symbols_based_on_part_1_test_case() {
-
         let giant_string = "467..114.....*........35..633.......#...617*...........+.58...592...........755....$.*.....664.598..";
 
         let array = parse_string_to_array(giant_string);
@@ -493,9 +491,10 @@ mod tests {
 
         let established_values_adjacent_to_symbol: i32 = coordinates_and_value_map
             .values()
-            .into_iter().map(|element| element.parse::<i32>().unwrap()).sum();
+            .into_iter()
+            .map(|element| element.parse::<i32>().unwrap())
+            .sum();
 
         assert_eq!(established_values_adjacent_to_symbol, 4361);
     }
-
 }
