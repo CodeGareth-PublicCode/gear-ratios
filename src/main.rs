@@ -404,4 +404,98 @@ mod tests {
             vec!["35", "467"]
         )
     }
+
+
+    #[test]
+    fn test_extract_numbers_adjacent_to_symbols_based_on_part_1_test_case() {
+
+        let giant_string = "467..114.....*........35..633.......#...617*...........+.58...592...........755....$.*.....664.598..";
+
+        let array = parse_string_to_array(giant_string);
+        let multi_array = form_multidimensional_array(&array, (10, 10));
+
+        let window_array = form_window_array(&multi_array);
+        let boolean_mask = form_boolean_mask(&window_array);
+        let chunked_window_array = chunk_window_array(&boolean_mask, 9);
+
+        let coordinate_pairings: HashSet<((usize, usize), (usize, usize))> =
+            extract_coordinates_for_all_non_dot_pairings(&chunked_window_array);
+
+        // print!("{}", &multi_array);
+        // println!("");
+        // println!("{:?}", &coordinate_pairings);
+
+        let filtered_pairing: Vec<_> = coordinate_pairings
+            .iter()
+            .filter(|pairing| {
+                let non_boolean_values =
+                    extract_non_boolean_pair_values_from_original_multidimensional_array(
+                        &multi_array,
+                        &pairing,
+                    );
+
+                let position_a_is_numeric =
+                    non_boolean_values.0.chars().any(|char| char.is_numeric())
+                        && non_boolean_values.1.chars().any(|char| !char.is_numeric());
+
+                let position_b_is_numeric =
+                    non_boolean_values.0.chars().any(|char| !char.is_numeric())
+                        && non_boolean_values.1.chars().any(|char| char.is_numeric());
+
+                if position_a_is_numeric || position_b_is_numeric {
+                    true
+                } else {
+                    false
+                }
+            })
+            .collect();
+
+        // println!("\n");
+        // println!("{:?}", &filtered_pairing);
+        // println!("\n");
+
+        let mut coordinates_and_value_map: HashMap<String, String> = HashMap::new();
+
+        for filtered_pair in filtered_pairing.iter() {
+            let target_number: &&((usize, usize), (usize, usize)) = filtered_pair;
+            let non_boolean_pair =
+                extract_non_boolean_pair_values_from_original_multidimensional_array(
+                    &multi_array,
+                    &target_number,
+                );
+
+            let position_a_is_numeric = non_boolean_pair.0.chars().any(|char| char.is_numeric())
+                && non_boolean_pair.1.chars().any(|char| !char.is_numeric());
+
+            let position_b_is_numeric = non_boolean_pair.0.chars().any(|char| !char.is_numeric())
+                && non_boolean_pair.1.chars().any(|char| char.is_numeric());
+
+            if position_a_is_numeric {
+                let traced_number = trace_whole_number_from_array_following_coordinates(
+                    &multi_array,
+                    &target_number.0,
+                );
+                coordinates_and_value_map
+                    .entry(traced_number.1)
+                    .or_insert(traced_number.0);
+            } else if position_b_is_numeric {
+                let traced_number = trace_whole_number_from_array_following_coordinates(
+                    &multi_array,
+                    &target_number.1,
+                );
+                coordinates_and_value_map
+                    .entry(traced_number.1)
+                    .or_insert(traced_number.0);
+            } else {
+                ()
+            }
+        }
+
+        let established_values_adjacent_to_symbol: i32 = coordinates_and_value_map
+            .values()
+            .into_iter().map(|element| element.parse::<i32>().unwrap()).sum();
+
+        assert_eq!(established_values_adjacent_to_symbol, 4361);
+    }
+
 }
