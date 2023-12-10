@@ -1,9 +1,84 @@
 use ndarray::{Array, ArrayBase, ArrayView, Dim, Ix, OwnedRepr};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::slice::Chunks;
 
 fn main() {
-    println!("Hello");
+    let file_path: &str = "./src/input.txt";
+    let content: String = std::fs::read_to_string(file_path).expect("should read from file");
+    let content_as_line = content.lines().collect::<String>();
+
+    let array = parse_string_to_array(&content_as_line);
+    let multi_array = form_multidimensional_array(&array, (140, 140));
+
+    let window_array = form_window_array(&multi_array);
+    let boolean_mask = form_boolean_mask(&window_array);
+    let chunked_window_array = chunk_window_array(&boolean_mask, 139);
+
+    let coordinate_pairings: HashSet<((usize, usize), (usize, usize))> =
+        extract_coordinates_for_all_non_dot_pairings(&chunked_window_array);
+
+    let filtered_pairing: Vec<_> = coordinate_pairings
+        .iter()
+        .filter(|pairing| {
+            let non_boolean_values =
+                extract_non_boolean_pair_values_from_original_multidimensional_array(
+                    &multi_array,
+                    &pairing,
+                );
+
+            let position_a_is_numeric = non_boolean_values.0.chars().any(|char| char.is_numeric())
+                && non_boolean_values.1.chars().any(|char| !char.is_numeric());
+
+            let position_b_is_numeric = non_boolean_values.0.chars().any(|char| !char.is_numeric())
+                && non_boolean_values.1.chars().any(|char| char.is_numeric());
+
+            if position_a_is_numeric || position_b_is_numeric {
+                true
+            } else {
+                false
+            }
+        })
+        .collect();
+
+    let mut coordinates_and_value_map: HashMap<String, String> = HashMap::new();
+
+    for filtered_pair in filtered_pairing.iter() {
+        let target_number: &&((usize, usize), (usize, usize)) = filtered_pair;
+        let non_boolean_pair = extract_non_boolean_pair_values_from_original_multidimensional_array(
+            &multi_array,
+            &target_number,
+        );
+
+        let position_a_is_numeric = non_boolean_pair.0.chars().any(|char| char.is_numeric())
+            && non_boolean_pair.1.chars().any(|char| !char.is_numeric());
+
+        let position_b_is_numeric = non_boolean_pair.0.chars().any(|char| !char.is_numeric())
+            && non_boolean_pair.1.chars().any(|char| char.is_numeric());
+
+        if position_a_is_numeric {
+            let traced_number =
+                trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.0);
+            coordinates_and_value_map
+                .entry(traced_number.1)
+                .or_insert(traced_number.0);
+        } else if position_b_is_numeric {
+            let traced_number =
+                trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.1);
+            coordinates_and_value_map
+                .entry(traced_number.1)
+                .or_insert(traced_number.0);
+        } else {
+            ()
+        }
+    }
+
+    let established_values_adjacent_to_symbol: i32 = coordinates_and_value_map
+        .values()
+        .into_iter()
+        .map(|element| element.parse::<i32>().unwrap())
+        .sum();
+
+    println!("{}", established_values_adjacent_to_symbol);
 }
 
 pub fn parse_string_to_array(input: &str) -> Vec<String> {
