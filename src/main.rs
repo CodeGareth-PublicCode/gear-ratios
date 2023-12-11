@@ -2,8 +2,6 @@ use ndarray::{Array, ArrayBase, ArrayView, Dim, Ix, OwnedRepr};
 use std::collections::HashMap;
 use std::slice::Chunks;
 use std::time::Instant;
-// ---- PART 2 START ----
-
 use std::collections::HashSet;
 
 fn main() {
