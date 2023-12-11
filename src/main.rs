@@ -1,10 +1,53 @@
 use ndarray::{Array, ArrayBase, ArrayView, Dim, Ix, OwnedRepr};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::slice::Chunks;
 
 // ---- PART 2 START ----
 
+use std::collections::HashSet;
+
 fn main() {
+    let variables = [true, false, true, false, true, false, true, false, true];
+    let mut combinations = Vec::new();
+
+    // Check all combinations of three variables
+    for i in 0..variables.len() {
+        for j in i + 1..variables.len() {
+            for k in j + 1..variables.len() {
+                combinations.push((i, j, k));
+            }
+        }
+    }
+
+    // Create a set to store connected combinations
+    let mut connected_combos = HashSet::new();
+
+    // Print the generated combinations and draw connections
+    for (idx, combo) in combinations.iter().enumerate() {
+        println!("Combination {}: {:?}", idx, combo);
+
+        // Draw connections
+        for other_combo in &combinations {
+            if combo != other_combo {
+                let share_variable = combo.iter().any(|&variable| other_combo.contains(&variable));
+                if share_variable {
+                    connected_combos.insert(idx);
+                    connected_combos.insert(combinations.iter().position(|&x| x == *other_combo).unwrap());
+                }
+            }
+        }
+    }
+
+    // Print the connections
+    for &connected_combo in &connected_combos {
+        println!("Connection between combinations {} and {}", connected_combo, connected_combo);
+    }
+}
+
+
+
+
+fn dudd_main() {
     let file_path: &str = "./src/input.txt";
     let content: String = std::fs::read_to_string(file_path).expect("should read from file");
     let content_as_line = content.lines().collect::<String>();
@@ -14,12 +57,9 @@ fn main() {
 
     let skinny_window_array = form_three_by_three_window_array(&multi_array);
     let boolean_mask = form_boolean_mask(&skinny_window_array);
-    let chunked_window_array = chunk_window_array(&boolean_mask, 139);
 
-    // println!(
-    //     "{:?}",
-    //     skinny_window_array.get(skinny_window_array.len() - 2)
-    // );
+    // Because you now are chunking 3x3 grids, reduce total size by 2 to reflect impossible anchor columns
+    let chunked_window_array = chunk_window_array(&boolean_mask, 138);
 
     let coordinate_trios: HashSet<((usize, usize), (usize, usize), (usize, usize))> =
         extract_coordinates_for_all_non_dot_trios(&chunked_window_array);
@@ -33,20 +73,20 @@ fn main() {
                     &trio,
                 );
 
-            let position_a_is_numeric = non_boolean_values.0.chars().any(|char| char.is_numeric());
+            let position_a_is_numeric =
+                non_boolean_values.0.chars().any(|char| char.is_numeric());
             let position_b_is_star = non_boolean_values.1 == "*";
-            let position_c_is_numeric = non_boolean_values.2.chars().any(|char| char.is_numeric());
+            let position_c_is_numeric =
+                non_boolean_values.2.chars().any(|char| char.is_numeric());
 
             if position_a_is_numeric && position_b_is_star && position_c_is_numeric {
-                true
-            } else {
-                false
+                println!("Keeping {:?}", non_boolean_values)
             }
+            return position_a_is_numeric && position_b_is_star && position_c_is_numeric
         })
         .collect();
 
     let mut coordinates_and_value_map: HashMap<i64, i64> = HashMap::new();
-    // dbg!(&filtered_trios.len());
     for filtered_trio in filtered_trios.iter() {
         let target_number: &&((usize, usize), (usize, usize), (usize, usize)) = filtered_trio;
 
@@ -54,8 +94,6 @@ fn main() {
             trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.0);
         let traced_number_c =
             trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.2);
-
-        // println!("{:?} {:?}", &traced_number_a.0, &traced_number_c.0);
 
         let traced_coordinates_total: i64 =
             traced_number_a.1.parse::<i64>().unwrap() + traced_number_c.1.parse::<i64>().unwrap();
@@ -70,7 +108,8 @@ fn main() {
     let result: i64 = coordinates_and_value_map.values().into_iter().sum();
 
     println!("Final result: {}", result);
-    assert_ne!(result, 46371710)
+    assert_ne!(result, 46371710);
+    assert_ne!(result, 55985365);
 }
 
 // ---- PART 1 START ----
@@ -232,7 +271,13 @@ pub fn map_trio_position_to_coordinate(position: usize) -> ([usize; 2], [usize; 
     //  (a1, b2, c1),
     //  (a3, b2, c3)
     //  (a1, b2, c2),
-    //  (a3, b2, c2)];
+    //  (a3, b2, c2),
+    //  (b1, b2, a3),
+    //  (b1, b2, c3)
+    //  (b1, b2, a2),
+    //  (b3, b2, a2),
+    //  (b1, b2, c2),
+    //  (b3, b2, c2),];
 
     match position {
         0 => ([0, 0], [1, 0], [2, 0]),
@@ -247,6 +292,12 @@ pub fn map_trio_position_to_coordinate(position: usize) -> ([usize; 2], [usize; 
         9 => ([0, 2], [1, 1], [2, 2]),
         10 => ([0, 1], [1, 1], [2, 1]),
         11 => ([0, 2], [1, 1], [2, 1]),
+        12 => ([1, 0], [1, 1], [0, 2]),
+        13 => ([1, 0], [1, 1], [2, 2]),
+        14 => ([1, 0], [1, 1], [0, 1]),
+        15 => ([1, 2], [1, 1], [0, 2]),
+        16 => ([1, 0], [1, 1], [3, 1]),
+        17 => ([1, 2], [1, 1], [2, 1]),
         _ => ([9, 9], [9, 9], [9, 9]),
     }
 }
@@ -372,29 +423,41 @@ pub fn extract_coordinates_for_all_non_dot_trios(
             let c3: bool = window_element.get((2, 2)).unwrap().to_owned();
 
             // Build out tuples reflecting every possible combo within a 3x3 grid
-            let combinations: [(bool, bool, bool); 12] = [
-                (a1, b1, c1),
-                (a2, b2, c2),
-                (a3, b3, c3),
-                (a1, a2, a3),
-                (b1, b2, b3),
-                (c1, c2, c3),
-                (c1, b2, a3),
-                (a1, b2, c3),
-                (a1, b2, c1),
-                (a3, b2, c3),
-                (a1, b2, c2),
-                (a3, b2, c2),
-            ];
+            // Avoid dumb hard coding every combo
+            let variables = [a1,a2,a3,b1,b2,b3,c1,c2,c3];
+            let mut combinations = Vec::new();
+
+            // Check all combinations of three variables
+            for i in 0..variables.len() {
+                for j in i + 1..variables.len() {
+                    for k in j + 1..variables.len() {
+                        combinations.push((variables[i], variables[j], variables[k]));
+                    }
+                }
+            }
+
+            // Avoid dumb hard coding every combo
+            let coordinate_variables = [[0,0], [0,1], [0,2], [1,0], [1,1], [1,2], [2,0], [2,1], [2,2]];
+            let mut coordinate_combinations = Vec::new();
+
+            // Check all combinations of three variables
+            for i in 0..coordinate_variables.len() {
+                for j in i + 1..coordinate_variables.len() {
+                    for k in j + 1..coordinate_variables.len() {
+                        coordinate_combinations.push((coordinate_variables[i], coordinate_variables[j], coordinate_variables[k]));
+                    }
+                }
+            }
+
             // println!("Found success at {:?}", &combinations.get(9));
 
             // Your looking for a pattern of TTT to match that neither are a dot
             // But 1 could be a symbol
             for (position, &combo) in combinations.iter().enumerate() {
                 if combo == (true, true, true) {
-                    // Translate values back to coordinates of 3x2 window grid
+                    // Translate values back to coordinates of 3x3 window grid
                     let (window_position_a, window_position_b, window_position_c) =
-                        map_trio_position_to_coordinate(position);
+                        coordinate_combinations.get(position).unwrap();
 
                     // Knowing the window coordinates, offset to trace
                     // coordinates in the original array
@@ -402,9 +465,9 @@ pub fn extract_coordinates_for_all_non_dot_trios(
                         offset_trio_coordinates_to_trace_back_to_original_array(
                             anchor_row,
                             chunk_column,
-                            window_position_a,
-                            window_position_b,
-                            window_position_c,
+                            *window_position_a,
+                            *window_position_b,
+                            *window_position_c,
                         );
 
                     non_dot_trio_coordinates.insert((
@@ -619,6 +682,7 @@ mod tests {
         let test_string = "467..114.....*........35..633.......#...617*...........+.58...592...........755....$.*.....664.598..";
         let array = parse_string_to_array(test_string);
         let multi_array = form_multidimensional_array(&array, (10, 10));
+        println!("{}", multi_array);
 
         // [[4, 6, 7, ., ., 1, 1, 4, ., .],
         //  [., ., ., *, ., ., ., ., ., .],
@@ -927,15 +991,6 @@ mod tests {
 
             coordinates_and_value_map.entry(traced_coordinates_total).or_insert(traced_values_product);
 
-            // coordinates_and_value_map
-            //     .entry((&traced_number_a.1).parse().unwrap())
-            //     .or_insert((&traced_number_a.0).parse().unwrap());
-
-            // coordinates_and_value_map
-            //     .entry((&traced_number_c.1).parse().unwrap())
-            //     .or_insert((&traced_number_c.0).parse().unwrap());
-
-            // dbg!(&coordinates_and_value_map);
         }
 
         let established_part_2_value_pairs_adjacent_to_star: i32 =
@@ -943,4 +998,99 @@ mod tests {
 
         assert_eq!(established_part_2_value_pairs_adjacent_to_star, 467835)
     }
+
+    #[test]
+    fn test_combo_maker() {
+
+        // Avoid dumb hard coding every combo
+        let variables = [(0,0), (0,1), (0,2), (1,0), (1,1), (1,2), (2,0), (2,1), (2,2)];
+        let mut combinations = Vec::new();
+
+        // Check all combinations of three variables
+        for i in 0..variables.len() {
+            for j in i + 1..variables.len() {
+                for k in j + 1..variables.len() {
+                    combinations.push((variables[i], variables[j], variables[k]));
+                }
+            }
+        }
+
+        // Pull each combo from array
+        // Print the generated combinations
+        for (idx, combo) in combinations.iter().enumerate() {
+            println!("Combination {}: {:?}", idx, combo);
+        }
+
+        println!("{:?}", combinations.get(5).unwrap());
+
+
+
+
+    }
+
+
+
+
+    #[test]
+    fn test_fake_3_by_3_grids() {
+        let giant_string = "..467..231*245..158..";
+
+        let array = parse_string_to_array(giant_string);
+        let multi_array = form_multidimensional_array(&array, (3, 7));
+
+        let skinny_window_array = form_three_by_three_window_array(&multi_array);
+        let boolean_mask = form_boolean_mask(&skinny_window_array);
+        let chunked_window_array = chunk_window_array(&boolean_mask, 5);
+
+        let coordinate_trios: HashSet<((usize, usize), (usize, usize), (usize, usize))> =
+            extract_coordinates_for_all_non_dot_trios(&chunked_window_array);
+
+        let filtered_trios: Vec<_> = coordinate_trios
+            .iter()
+            .filter(|trio| {
+                let non_boolean_values =
+                    extract_non_boolean_trio_values_from_original_multidimensional_array(
+                        &multi_array,
+                        &trio,
+                    );
+
+                let position_a_is_numeric =
+                    non_boolean_values.0.chars().any(|char| char.is_numeric());
+                let position_b_is_star = non_boolean_values.1 == "*";
+                let position_c_is_numeric =
+                    non_boolean_values.2.chars().any(|char| char.is_numeric());
+
+                if position_a_is_numeric && position_b_is_star && position_c_is_numeric {
+                    println!("Keeping {:?}", non_boolean_values)
+                }
+                return position_a_is_numeric && position_b_is_star && position_c_is_numeric
+            })
+            .collect();
+
+        let mut coordinates_and_value_map: HashMap<i32, i32> = HashMap::new();
+
+        for filtered_trio in filtered_trios.iter() {
+            let target_number: &&((usize, usize), (usize, usize), (usize, usize)) = filtered_trio;
+            println!("{:?}", &target_number);
+            let traced_number_a =
+                trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.0);
+            let traced_number_c =
+                trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.2);
+            //
+            // let traced_coordinates_total: i32 = &traced_number_a.1.parse::<i32>().unwrap()
+            //     + &traced_number_c.1.parse::<i32>().unwrap();
+            // let traced_values_product: i32 = &traced_number_a.0.parse::<i32>().unwrap()
+            //     * &traced_number_c.0.parse::<i32>().unwrap();
+
+            coordinates_and_value_map.entry((&traced_number_a.1).parse().unwrap()).or_insert((&traced_number_a.0).parse().unwrap());
+            coordinates_and_value_map.entry((&traced_number_c.1).parse().unwrap()).or_insert((&traced_number_c.0).parse().unwrap());
+
+        }
+        println!("{:?}", coordinates_and_value_map);
+
+
+
+    }
+
+
 }
