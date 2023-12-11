@@ -7,41 +7,90 @@ use std::slice::Chunks;
 use std::collections::HashSet;
 
 fn main() {
-    let variables = [true, false, true, false, true, false, true, false, true];
-    let mut combinations = Vec::new();
+    let file_path: &str = "./src/input.txt";
+    let content: String = std::fs::read_to_string(file_path).expect("should read from file");
+    let content_as_line = content.lines().collect::<String>();
 
-    // Check all combinations of three variables
-    for i in 0..variables.len() {
-        for j in i + 1..variables.len() {
-            for k in j + 1..variables.len() {
-                combinations.push((i, j, k));
+    let array = parse_string_to_array(&content_as_line);
+    let multi_array = form_multidimensional_array(&array, (140, 140));
+
+    let window_array = form_window_array(&multi_array);
+    let boolean_mask = form_boolean_mask(&window_array);
+    let chunked_window_array = chunk_window_array(&boolean_mask, 139);
+
+    let coordinate_pairings: HashSet<((usize, usize), (usize, usize))> =
+        extract_coordinates_for_all_non_dot_pairings(&chunked_window_array);
+
+    let filtered_pairing: Vec<_> = coordinate_pairings
+        .iter()
+        .filter(|pairing| {
+            let non_boolean_values =
+                extract_non_boolean_pair_values_from_original_multidimensional_array(
+                    &multi_array,
+                    &pairing,
+                );
+
+            let position_a_is_numeric = non_boolean_values.0.chars().any(|char| char.is_numeric())
+                && non_boolean_values.1.chars().any(|char| !char.is_numeric());
+
+            let position_b_is_numeric = non_boolean_values.0.chars().any(|char| !char.is_numeric())
+                && non_boolean_values.1.chars().any(|char| char.is_numeric());
+
+            let position_a_is_star = non_boolean_values.0 == "*";
+            let position_b_is_star = non_boolean_values.1 == "*";
+
+            if position_a_is_numeric && position_b_is_star {
+                true
+            } else if position_b_is_numeric && position_a_is_star {
+                true
+            } else {
+                false
             }
+        })
+        .collect();
+
+    let mut coordinates_and_value_map: HashMap<((usize, usize)), Vec<String>> = HashMap::new();
+
+    for filtered_pair in filtered_pairing.iter() {
+        let target_number: &&((usize, usize), (usize, usize)) = filtered_pair;
+        let non_boolean_pair = extract_non_boolean_pair_values_from_original_multidimensional_array(
+            &multi_array,
+            &target_number,
+        );
+
+        let position_a_is_numeric = non_boolean_pair.0.chars().any(|char| char.is_numeric())
+            && non_boolean_pair.1.chars().any(|char| !char.is_numeric());
+
+        let position_b_is_numeric = non_boolean_pair.0.chars().any(|char| !char.is_numeric())
+            && non_boolean_pair.1.chars().any(|char| char.is_numeric());
+
+        let position_a_is_star = non_boolean_pair.0 == "*";
+        let position_b_is_star = non_boolean_pair.1 == "*";
+
+        if position_a_is_numeric && position_b_is_star {
+            let traced_number =
+                trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.0);
+            coordinates_and_value_map
+                .entry(target_number.1)
+                .or_insert(vec![]).push(traced_number.0);
+        } else if position_b_is_numeric && position_a_is_star {
+            let traced_number =
+                trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.1);
+            coordinates_and_value_map
+                .entry(target_number.1)
+                .or_insert(vec![]).push(traced_number.0);
+        } else {
+            ()
         }
+
     }
 
-    // Create a set to store connected combinations
-    let mut connected_combos = HashSet::new();
-
-    // Print the generated combinations and draw connections
-    for (idx, combo) in combinations.iter().enumerate() {
-        println!("Combination {}: {:?}", idx, combo);
-
-        // Draw connections
-        for other_combo in &combinations {
-            if combo != other_combo {
-                let share_variable = combo.iter().any(|&variable| other_combo.contains(&variable));
-                if share_variable {
-                    connected_combos.insert(idx);
-                    connected_combos.insert(combinations.iter().position(|&x| x == *other_combo).unwrap());
-                }
-            }
-        }
-    }
-
-    // Print the connections
-    for &connected_combo in &connected_combos {
-        println!("Connection between combinations {} and {}", connected_combo, connected_combo);
-    }
+    dbg!(coordinates_and_value_map);
+    // let established_values_adjacent_to_symbol: i32 = coordinates_and_value_map
+    //     .values()
+    //     .into_iter()
+    //     .map(|element| element.parse::<i32>().unwrap())
+    //     .sum();
 }
 
 
@@ -313,6 +362,11 @@ pub fn offset_coordinates_to_trace_back_to_original_array(
 
     let offset_original_b_y_axis = anchor_row + position_b[0];
     let offset_original_b_x_axis = chunk_column + position_b[1];
+
+    // dbg!((
+    //     (&offset_position_a_y_axis, &offset_position_a_x_axis),
+    //     (&offset_original_b_y_axis, &offset_original_b_x_axis),
+    // ));
 
     (
         (offset_position_a_y_axis, offset_position_a_x_axis),
@@ -1028,8 +1082,227 @@ mod tests {
 
     }
 
+    #[test]
+    fn test_part_2_test_case_with_star_solar_system_idea() {
 
+        let giant_string = "467..114.....*........35..633.......#...617*...........+.58...592...........755....$.*.....664.598..";
 
+        let array = parse_string_to_array(giant_string);
+        let multi_array = form_multidimensional_array(&array, (10, 10));
+
+        let window_array = form_window_array(&multi_array);
+        let boolean_mask = form_boolean_mask(&window_array);
+        let chunked_window_array = chunk_window_array(&boolean_mask, 9);
+
+        let coordinate_pairings: HashSet<((usize, usize), (usize, usize))> =
+            extract_coordinates_for_all_non_dot_pairings(&chunked_window_array);
+
+        let filtered_pairing: Vec<_> = coordinate_pairings
+            .iter()
+            .filter(|pairing| {
+                let non_boolean_values =
+                    extract_non_boolean_pair_values_from_original_multidimensional_array(
+                        &multi_array,
+                        &pairing,
+                    );
+
+                let position_a_is_numeric = non_boolean_values.0.chars().any(|char| char.is_numeric())
+                    && non_boolean_values.1.chars().any(|char| !char.is_numeric());
+
+                let position_b_is_numeric = non_boolean_values.0.chars().any(|char| !char.is_numeric())
+                    && non_boolean_values.1.chars().any(|char| char.is_numeric());
+
+                let position_a_is_star = non_boolean_values.0 == "*";
+                let position_b_is_star = non_boolean_values.1 == "*";
+
+                if position_a_is_numeric && position_b_is_star {
+                    true
+                } else if position_b_is_numeric && position_a_is_star {
+                    true
+                } else {
+                    false
+                }
+            })
+            .collect();
+
+        let mut coordinates_and_value_map: HashMap<((usize, usize)), Vec<String>> = HashMap::new();
+        let mut numbers_already_traced: HashSet<String> = HashSet::new();
+
+        for filtered_pair in filtered_pairing.iter() {
+            let target_number: &&((usize, usize), (usize, usize)) = filtered_pair;
+            // dbg!(&target_number);
+            let non_boolean_pair = extract_non_boolean_pair_values_from_original_multidimensional_array(
+                &multi_array,
+                &target_number,
+            );
+
+            let position_a_is_numeric = non_boolean_pair.0.chars().any(|char| char.is_numeric())
+                && non_boolean_pair.1.chars().any(|char| !char.is_numeric());
+
+            let position_b_is_numeric = non_boolean_pair.0.chars().any(|char| !char.is_numeric())
+                && non_boolean_pair.1.chars().any(|char| char.is_numeric());
+
+            let position_a_is_star = non_boolean_pair.0 == "*";
+            let position_b_is_star = non_boolean_pair.1 == "*";
+
+            if position_a_is_numeric && position_b_is_star {
+                let traced_number =
+                    trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.0);
+
+                if !numbers_already_traced.contains(&traced_number.1) {
+                    coordinates_and_value_map
+                        .entry(target_number.1)
+                        .or_insert(vec![]).push(traced_number.0);
+                }
+
+                numbers_already_traced.insert(traced_number.1);
+
+            } else if position_b_is_numeric && position_a_is_star {
+                let traced_number =
+                    trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.1);
+
+                if !numbers_already_traced.contains(&traced_number.1) {
+                    coordinates_and_value_map
+                        .entry(target_number.0)
+                        .or_insert(vec![]).push(traced_number.0);
+                }
+
+                numbers_already_traced.insert(traced_number.1);
+            } else {
+                ()
+            }
+
+        }
+
+        let mut total_counter = 0;
+
+        for store in coordinates_and_value_map.values() {
+
+            if store.len() > 1 {
+                let store_product: i32 = store.iter().map(|traced_number| traced_number.parse::<i32>().unwrap()).product();
+                total_counter += store_product
+            }
+
+        }
+        //
+        // dbg!(coordinates_and_value_map);
+        //
+        // println!("{}", total_counter);
+        assert_eq!(total_counter, 467835)
+    }
+
+    #[test]
+    fn test_part_2_real_case_with_star_solar_system_idea() {
+
+        let file_path: &str = "./src/input.txt";
+        let content: String = std::fs::read_to_string(file_path).expect("should read from file");
+        let content_as_line = content.lines().collect::<String>();
+
+        let array = parse_string_to_array(&content_as_line);
+        let multi_array = form_multidimensional_array(&array, (140, 140));
+
+        let window_array = form_window_array(&multi_array);
+        let boolean_mask = form_boolean_mask(&window_array);
+        let chunked_window_array = chunk_window_array(&boolean_mask, 139);
+
+        let coordinate_pairings: HashSet<((usize, usize), (usize, usize))> =
+            extract_coordinates_for_all_non_dot_pairings(&chunked_window_array);
+
+        let filtered_pairing: Vec<_> = coordinate_pairings
+            .iter()
+            .filter(|pairing| {
+                let non_boolean_values =
+                    extract_non_boolean_pair_values_from_original_multidimensional_array(
+                        &multi_array,
+                        &pairing,
+                    );
+
+                let position_a_is_numeric = non_boolean_values.0.chars().any(|char| char.is_numeric())
+                    && non_boolean_values.1.chars().any(|char| !char.is_numeric());
+
+                let position_b_is_numeric = non_boolean_values.0.chars().any(|char| !char.is_numeric())
+                    && non_boolean_values.1.chars().any(|char| char.is_numeric());
+
+                let position_a_is_star = non_boolean_values.0 == "*";
+                let position_b_is_star = non_boolean_values.1 == "*";
+
+                if position_a_is_numeric && position_b_is_star {
+                    true
+                } else if position_b_is_numeric && position_a_is_star {
+                    true
+                } else {
+                    false
+                }
+            })
+            .collect();
+
+        let mut coordinates_and_value_map: HashMap<((usize, usize)), Vec<String>> = HashMap::new();
+        let mut numbers_already_traced: HashSet<String> = HashSet::new();
+
+        for filtered_pair in filtered_pairing.iter() {
+            let target_number: &&((usize, usize), (usize, usize)) = filtered_pair;
+            // dbg!(&target_number);
+            let non_boolean_pair = extract_non_boolean_pair_values_from_original_multidimensional_array(
+                &multi_array,
+                &target_number,
+            );
+
+            let position_a_is_numeric = non_boolean_pair.0.chars().any(|char| char.is_numeric())
+                && non_boolean_pair.1.chars().any(|char| !char.is_numeric());
+
+            let position_b_is_numeric = non_boolean_pair.0.chars().any(|char| !char.is_numeric())
+                && non_boolean_pair.1.chars().any(|char| char.is_numeric());
+
+            let position_a_is_star = non_boolean_pair.0 == "*";
+            let position_b_is_star = non_boolean_pair.1 == "*";
+
+            if position_a_is_numeric && position_b_is_star {
+                let traced_number =
+                    trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.0);
+
+                if !numbers_already_traced.contains(&traced_number.1) {
+                    coordinates_and_value_map
+                        .entry(target_number.1)
+                        .or_insert(vec![]).push(traced_number.0);
+                }
+
+                numbers_already_traced.insert(traced_number.1);
+
+            } else if position_b_is_numeric && position_a_is_star {
+                let traced_number =
+                    trace_whole_number_from_array_following_coordinates(&multi_array, &target_number.1);
+
+                if !numbers_already_traced.contains(&traced_number.1) {
+                    coordinates_and_value_map
+                        .entry(target_number.0)
+                        .or_insert(vec![]).push(traced_number.0);
+                }
+
+                numbers_already_traced.insert(traced_number.1);
+            } else {
+                ()
+            }
+
+        }
+
+        let mut total_counter = 0;
+
+        for store in coordinates_and_value_map.values() {
+
+            if store.len() > 1 {
+                let store_product: i32 = store.iter().map(|traced_number| traced_number.parse::<i32>().unwrap()).product();
+                total_counter += store_product
+            }
+
+        }
+        //
+        // dbg!(coordinates_and_value_map);
+        //
+        println!("{}", total_counter);
+        assert_ne!(total_counter, 467835);
+        assert_ne!(total_counter, 46371710);
+        assert_ne!(total_counter, 55985365);
+    }
 
     #[test]
     fn test_fake_3_by_3_grids() {
